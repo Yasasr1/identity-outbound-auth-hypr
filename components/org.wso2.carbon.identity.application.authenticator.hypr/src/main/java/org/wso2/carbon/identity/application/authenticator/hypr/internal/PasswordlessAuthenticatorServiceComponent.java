@@ -24,8 +24,12 @@ import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
 import org.wso2.carbon.identity.application.authentication.framework.ApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authenticator.hypr.HyprAuthenticator;
+import org.wso2.carbon.user.core.service.RealmService;
 
 /**
  * Service component class for the HYPR Authenticator initialization.
@@ -69,6 +73,35 @@ public class PasswordlessAuthenticatorServiceComponent {
         if (log.isDebugEnabled()) {
             log.debug("Passwordless Authenticator bundle is deactivated");
         }
+    }
+
+    /**
+     * This method is to set the Realm Service.
+     *
+     * @param realmService The Realm Service
+     */
+    @Reference(
+            name = "realm.service",
+            service = org.wso2.carbon.user.core.service.RealmService.class,
+            cardinality = ReferenceCardinality.MANDATORY,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind = "unsetRealmService"
+    )
+    protected void setRealmService(RealmService realmService) {
+
+        log.debug("Setting the Realm Service");
+        PasswordlessAuthenticatorServiceDataHolder.getInstance().setRealmService(realmService);
+    }
+
+    /**
+     * This method is to unset the Realm Service.
+     *
+     * @param realmService The Realm Service
+     */
+    protected void unsetRealmService(RealmService realmService) {
+
+        log.debug("UnSetting the Realm Service");
+        PasswordlessAuthenticatorServiceDataHolder.getInstance().setRealmService(null);
     }
 
 }

@@ -35,10 +35,18 @@ import org.wso2.carbon.identity.application.authenticator.hypr.common.exception.
 import org.wso2.carbon.identity.application.authenticator.hypr.common.model.DeviceAuthenticationResponse;
 import org.wso2.carbon.identity.application.authenticator.hypr.common.model.RegisteredDevicesResponse;
 import org.wso2.carbon.identity.application.authenticator.hypr.common.web.HYPRAuthorizationAPIClient;
+import org.wso2.carbon.identity.application.authenticator.hypr.internal.PasswordlessAuthenticatorServiceDataHolder;
 import org.wso2.carbon.identity.application.common.model.Property;
+import org.wso2.carbon.identity.base.IdentityRuntimeException;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 import org.wso2.carbon.identity.core.ServiceURLBuilder;
 import org.wso2.carbon.identity.core.URLBuilderException;
+import org.wso2.carbon.user.api.UserRealm;
+import org.wso2.carbon.user.api.UserStoreException;
+import org.wso2.carbon.user.core.UserStoreManager;
+import org.wso2.carbon.user.core.common.AbstractUserStoreManager;
+import org.wso2.carbon.user.core.common.User;
+import org.wso2.carbon.user.core.service.RealmService;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,6 +55,7 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import static org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants.USERNAME_CLAIM;
 
 /**
  * The HyprAuthenticator class contains all the functional tasks handled by the authenticator with HYPR IdP and
@@ -232,7 +241,7 @@ public class HyprAuthenticator extends AbstractApplicationAuthenticator implemen
         String apiToken = authenticatorProperties.get(HYPR.HYPR_API_TOKEN);
 
         // Validate username and the HYPR configurable parameters.
-        if (StringUtils.isBlank(username)) {
+        if (StringUtils.isBlank(username) || !isExistingUser(username, context)) {
             redirectHYPRLoginPage(response, context, HYPR.AuthenticationStatus.INVALID_REQUEST);
             return;
         }
@@ -305,6 +314,36 @@ public class HyprAuthenticator extends AbstractApplicationAuthenticator implemen
                 throw e;
             }
         }
+    }
+
+    /**
+     * Check whether the user exists in the tenant domain.
+     *
+     * @param username The username of the user.
+     * @param context  The Authentication context received by the authenticator.
+     * @return True if the user exists in the tenant domain, false otherwise.
+     */
+    private boolean isExistingUser(String username, AuthenticationContext context)  {
+        if (StringUtils.isNotBlank(context.getTenantDomain())) {
+            try {
+                RealmService realmService = PasswordlessAuthenticatorServiceDataHolder.getInstance().getRealmService();
+                int tenantId = realmService.getTenantManager().getTenantId(context.getTenantDomain());
+                UserRealm userRealm = realmService.getTenantUserRealm(tenantId);
+                if (userRealm != null) {
+                    UserStoreManager userStoreManager = (UserStoreManager) userRealm.getUserStoreManager();
+                    List<User> userList = ((AbstractUserStoreManager) userStoreManager).getUserListWithID(
+                            USERNAME_CLAIM, username, null);
+                    return !userList.isEmpty();
+                }
+
+            } catch (IdentityRuntimeException e) {
+                LOG.error("Error while trying to get the tenant ID of the user " + username, e);
+            } catch (UserStoreException e) {
+                LOG.error("Error while checking the existence of the user " + username, e);
+            }
+        }
+
+        return false;
     }
 
     private String getMaskedUsername(String username) {

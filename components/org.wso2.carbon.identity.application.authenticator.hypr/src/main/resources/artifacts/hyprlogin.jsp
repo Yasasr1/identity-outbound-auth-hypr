@@ -120,7 +120,6 @@
         byte[] encoding = Base64.encodeBase64(toEncode.getBytes());
         String authHeader = new String(encoding, Charset.defaultCharset());
         String header = "Client " + authHeader;
-        System.out.println(header);
     %>
 
     <script type="text/javascript">
